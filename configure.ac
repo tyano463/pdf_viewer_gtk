@@ -4,6 +4,8 @@ AM_INIT_AUTOMAKE([foreign])
 
 AC_CANONICAL_HOST
 
+AC_PROG_CC
+
 # GTK+3.0の検出
 PKG_CHECK_MODULES([GTK], [gtk+-3.0])
 

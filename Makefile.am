@@ -3,8 +3,5 @@ myapp_SOURCES = main.c
 
 # GTK+3.0のフラグを利用するための設定
 AM_CFLAGS = $(GTK_CFLAGS)
-AM_LDFLAGS = $(GTK_LIBS)
+AM_LDFLAGS = $(GTK_LIBS) -lmupdf
 
-# コンパイルフラグの設定
-CPPFLAGS = $(CPPFLAGS)
-LDFLAGS = $(LDFLAGS)
