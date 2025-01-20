@@ -9,5 +9,11 @@ AC_PROG_CC
 # GTK+3.0の検出
 PKG_CHECK_MODULES([GTK], [gtk+-3.0])
 
+if [[ "x${target}" != "x" ]] ; then
+    CFLAGS="$CFLAGS --sysroot=$STAGING_DIR"
+    CXXFLAGS="$CXXFLAGS --sysroot=$STAGING_DIR"
+    LDFLAGS="$LDFLAGS --sysroot=$STAGING_DIR"
+fi
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
