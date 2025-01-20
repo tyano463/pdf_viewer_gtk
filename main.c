@@ -162,7 +162,7 @@ static void activate(GtkApplication *app, gpointer user_data)
         pdf->doc = fz_open_document(pdf->ctx, PDF_FILE);
     fz_catch(pdf->ctx)
     {
-        fz_report_error(pdf->ctx);
+        //fz_report_error(pdf->ctx);
         d("cannot open document");
         fz_drop_context(pdf->ctx);
         return;
