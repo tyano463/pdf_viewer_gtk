@@ -18,7 +18,7 @@ gcc `pkg-config --libs gtk+-3.0` -lmupdf gtk_sample.o -o gtk_sample
 ```
 )";
 
-#define PDF_FILE "/home/tyano/workspace/pdf/mtex_sample/sample.pdf"
+#define PDF_FILE "/usr/share/sample.pdf"
 #define SWIPE_MARGIN (50)
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -162,7 +162,7 @@ static void activate(GtkApplication *app, gpointer user_data)
         pdf->doc = fz_open_document(pdf->ctx, PDF_FILE);
     fz_catch(pdf->ctx)
     {
-        fz_report_error(pdf->ctx);
+        // fz_report_error(pdf->ctx);
         d("cannot open document");
         fz_drop_context(pdf->ctx);
         return;
