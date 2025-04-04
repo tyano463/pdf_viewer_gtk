@@ -11,6 +11,8 @@
 /configure
 /depcomp
 /install-sh
-/main.o
+/*.o
 /missing
 /myapp
+/configure~
+/pdf_viewer

@@ -1,116 +1,64 @@
-#include <gtk/gtk.h>
+
 #include <stdbool.h>
-#include <mupdf/fitz.h>
 
-const char *Explain = R"(
-# Build 
-
-## Requirement
-
-- [gtk3](https://www.gtk.org/docs/installations/linux/)
-- [mupdf](https://mupdf.com/)
-
-## Command
-
-```
-gcc -g -O0 `pkg-config --cflags gtk+-3.0` -c gtk_sample.c
-gcc `pkg-config --libs gtk+-3.0` -lmupdf gtk_sample.o -o gtk_sample
-```
-)";
+#include "v_common.h"
+#include "v_pdf.h"
+#include "v_menu.h"
 
 #define PDF_FILE "/usr/share/sample.pdf"
 #define SWIPE_MARGIN (50)
 
-#define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-
-#define d(x, ...)                                                                      \
-    do                                                                                 \
-    {                                                                                  \
-        g_print("%s(%d) %s " x "\n", __FILENAME__, __LINE__, __func__, ##__VA_ARGS__); \
-    } while (0)
-
-#define ERR_RETn(c)            \
-    do                         \
-    {                          \
-        if (c)                 \
-            goto error_return; \
-    } while (0)
-
-
-/**
- * There is no button definition in gtk.
- * 
- * The following is the gtk explanation.
- * 
- * /usr/include/gtk-3.0/gdk/gdkevents.h:706L
- * 
- * @button: the button which was pressed or released, numbered from 1 to 5.
- *   Normally button 1 is the left mouse button, 2 is the middle button,
- *   and 3 is the right button. On 2-button mice, the middle button can
- *   often be simulated by pressing both mouse buttons together.
- * 
- */
-#define MOUSE_BUTTON_LEFT 1
-#define MOUSE_BUTTON_MIDDLE 2
-#define MOUSE_BUTTON_RIGHT 3
-
-typedef struct
+static void button_callback(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
-    fz_context *ctx;
-    fz_document *doc;
-    fz_page *page;
-    int width;
-    int height;
-} PdfData;
+    v_menu_t *menu = (v_menu_t*)data;
+    // d("%p", menu);
+}
 
 static void draw_callback(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
-    PdfData *pdf = (PdfData *)data;
-    fz_pixmap *pix;
-    fz_matrix ctm;
+    GdkPoint size;
+    v_status_t status;
 
-    ctm = fz_scale(1, 1);
+//    d("");
+    status = v_pdf_getsize(&size.x, &size.y);
+    ERR_RETn(status);
+//    d("%d, %d", size.x, size.y);
 
-    pix = fz_new_pixmap_from_page_number(pdf->ctx, pdf->doc, 0, ctm, fz_device_rgb(pdf->ctx), 0);
+//    cairo_set_source_rgb(cr, 0.678, 0.847, 0.902);
+//    cairo_paint(cr);
+#if 0
+    cairo_rectangle(cr, 0, 24, size.x, size.y);
+    cairo_clip(cr);
+#endif
 
-    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, pix->w, pix->h);
+    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, size.x, size.y);
     unsigned char *surface_data = cairo_image_surface_get_data(surface);
     int rowstride = cairo_image_surface_get_stride(surface);
 
-    for (int i = 0; i < pix->h; i++)
-    {
-        uint8_t *s = &pix->samples[i * pix->stride];
-        for (int j = 0; j < pix->w; j++)
-        {
-            guchar *p = surface_data + i * rowstride + j * 4;
-            if (pix->n == 4)
-            {
-                p[0] = s[2];
-                p[1] = s[1];
-                p[2] = s[0];
-            }
-            else
-            {
-                p[0] = p[1] = p[2] = s[0];
-            }
-            s += pix->n;
-        }
-    }
+//    d("stride:%d", rowstride);
+    status = v_pdf_getsize(&size.x, &size.y);
+//    d("%d, %d", size.x, size.y);
+    status = v_pdf_alloc_pixel_data(surface_data, 0, rowstride, (pdf_scale_t){1, 1});
+    ERR_RETn(status);
+
     cairo_set_source_surface(cr, surface, 0, 0);
     cairo_paint(cr);
     cairo_surface_destroy(surface);
 
-    fz_drop_pixmap(pdf->ctx, pix);
+    v_pdf_release_pixel_data();
+
+error_return:
+    return;
 }
 
-//static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
+// static gboolean motion_notify_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 static gboolean motion_notify_event(GtkWidget *widget, GdkEventButton *event, gpointer data)
 {
     static gdouble start_x = -1;
     static gdouble start_y = -1;
     gdouble dx, dy;
 
-    ERR_RETn (event->button != MOUSE_BUTTON_LEFT);
+    ERR_RETn(event->button != MOUSE_BUTTON_LEFT);
 
     if (event->type == GDK_BUTTON_PRESS)
     {
@@ -147,62 +95,56 @@ static void activate(GtkApplication *app, gpointer user_data)
 {
     GtkWidget *window;
     GtkDrawingArea *drawing_area;
-    PdfData *pdf = g_new(PdfData, 1);
+    GdkPoint size;
 
-    pdf->ctx = fz_new_context(NULL, NULL, FZ_STORE_UNLIMITED);
-    if (!pdf->ctx)
-    {
-        g_error("Could not create MuPDF context\n");
-    }
+    v_status_t status;
 
-    fz_register_document_handlers(pdf->ctx);
+    status = v_pdf_init();
+    ERR_RETn(status);
 
-    // Open the PDF document
-    fz_try(pdf->ctx)
-        pdf->doc = fz_open_document(pdf->ctx, PDF_FILE);
-    fz_catch(pdf->ctx)
-    {
-        // fz_report_error(pdf->ctx);
-        d("cannot open document");
-        fz_drop_context(pdf->ctx);
-        return;
-    }
+    status = v_pdf_open(PDF_FILE);
+    ERR_RETn(status);
 
-    int page_count = fz_count_pages(pdf->ctx, pdf->doc);
+    int page_count = v_pdf_pagecount();
 
-    d("ttl page:%d", page_count);
-    // Load the first page
-    pdf->page = fz_load_page(pdf->ctx, pdf->doc, 0);
-    fz_rect bounds = fz_bound_page(pdf->ctx, pdf->page);
-    pdf->width = bounds.x1 - bounds.x0;
-    pdf->height = bounds.y1 - bounds.y0;
+    status = v_pdf_getsize(&size.x, &size.y);
+    ERR_RETn(status);
 
-    d("w:%d h:%d", pdf->width, pdf->height);
-    // Create GTK window
     window = gtk_application_window_new(app);
-    gtk_window_set_default_size(GTK_WINDOW(window), pdf->width, pdf->height);
+    gtk_window_set_default_size(GTK_WINDOW(window), size.x, size.y);
     gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+
+    GtkWidget *overlay = gtk_overlay_new();
+    gtk_container_add(GTK_CONTAINER(window), overlay);
 
     // Create a drawing area and set the draw callback
     drawing_area = (GtkDrawingArea *)gtk_drawing_area_new();
-    gtk_container_add(GTK_CONTAINER(window), (GtkWidget *)drawing_area);
-    //    gtk_widget_set_events((GtkWidget*)drawing_area, gtk_widget_get_events ((GtkWidget*)drawing_area) | GDK_POINTER_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK );
+    gtk_overlay_add_overlay(GTK_OVERLAY(overlay), (GtkWidget *)drawing_area);
     gtk_widget_set_events((GtkWidget *)drawing_area, gtk_widget_get_events((GtkWidget *)drawing_area) | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
-    //     g_signal_connect(G_OBJECT(drawing_area), "motion-notify-event", G_CALLBACK(motion_notify_event), NULL);
     g_signal_connect(G_OBJECT(drawing_area), "button-press-event", G_CALLBACK(motion_notify_event), NULL);
     g_signal_connect(G_OBJECT(drawing_area), "button-release-event", G_CALLBACK(motion_notify_event), NULL);
 
-    g_signal_connect((GtkWidget *)drawing_area, "draw", G_CALLBACK(draw_callback), pdf);
+    g_signal_connect((GtkWidget *)drawing_area, "draw", G_CALLBACK(draw_callback), NULL);
 
+    GtkWidget *container = gtk_fixed_new();
+    gtk_widget_set_size_request(container, 24, 24);
+
+    gtk_overlay_add_overlay(GTK_OVERLAY(overlay), container);
+    gtk_widget_set_halign(container, GTK_ALIGN_START);
+    gtk_widget_set_valign(container, GTK_ALIGN_START);
+
+    v_menu_t *menu = v_menu_init(container);
+    g_signal_connect(container, "draw", G_CALLBACK(button_callback), menu);
     gtk_widget_show_all(window);
+
+error_return:
+    return;
 }
 
 int main(int argc, char **argv)
 {
     GtkApplication *app;
     int status;
-
-    (void)Explain;
 
     app = gtk_application_new("A.B", G_APPLICATION_DEFAULT_FLAGS);
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
